@@ -179,6 +179,41 @@ namespace minigit
         }
     }
 
+    string getCurrentBranch()
+    {
+        string headPath = ".minigit/HEAD";
+        if (!fs::exists(headPath))
+        {
+            return "";
+        }
+
+        ifstream file(headPath);
+        string head_content;
+        getline(file, head_content);
+
+        string ref_prefix = "ref: refs/heads/";
+        if (head_content.rfind(ref_prefix, 0) == 0)
+        {
+            return head_content.substr(ref_prefix.length());
+        }
+        return ""; // detached or missing
+    }
+
+    bool isDetachedHead()
+    {
+        string headPath = ".minigit/HEAD";
+        if (!fs::exists(headPath))
+        {
+            return false;
+        }
+
+        ifstream file(headPath);
+        string head_content;
+        getline(file, head_content);
+
+        return head_content.rfind("ref: ", 0) != 0;
+    }
+
     vector<string> getUntrackedFiles()
     {
         vector<string> untracked;

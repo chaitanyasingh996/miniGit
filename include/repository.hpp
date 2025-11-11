@@ -26,6 +26,18 @@ namespace minigit
     string getHeadCommit();
 
     /**
+     * @brief Get the current branch name
+     * @return The branch name, or empty string if in detached HEAD state
+     */
+    string getCurrentBranch();
+
+    /**
+     * @brief Check if HEAD is in detached state
+     * @return true if detached, false if on a branch
+     */
+    bool isDetachedHead();
+
+    /**
      * @brief Get list of untracked files in working directory
      * @return Vector of file paths not in index
      */
