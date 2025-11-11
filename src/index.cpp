@@ -7,68 +7,94 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+// Simple in-memory cache to avoid repeated file reads
+static map<string, IndexEntry> g_index_cache;
+static bool g_cache_loaded = false;
 
-using namespace std;
-namespace fs = filesystem;
-
-namespace minigit
+map<string, IndexEntry> readIndex()
 {
-
-    map<string, IndexEntry> readIndex()
+    if (g_cache_loaded)
     {
-        map<string, IndexEntry> index;
-        string indexPath = ".minigit/index";
+        return g_index_cache;
+    }
 
-        if (!fs::exists(indexPath))
-        {
-            return index;
-        }
+    map<string, IndexEntry> index;
+    string indexPath = ".minigit/index";
 
-        ifstream file(indexPath);
-        string line;
-        while (getline(file, line))
-        {
-            stringstream ss(line);
-            string mode, hash, filepath;
-            ss >> mode >> hash >> filepath;
-            index[filepath] = {mode, hash};
-        }
-
+    if (!fs::exists(indexPath))
+    {
+        g_index_cache = index;
+        g_cache_loaded = true;
         return index;
     }
 
-    void writeIndex(const map<string, IndexEntry> &index)
+    ifstream file(indexPath);
+    string line;
+    while (getline(file, line))
     {
-        string indexPath = ".minigit/index";
-        ofstream file(indexPath);
-
-        for (const auto &[filepath, entry] : index)
-        {
-            file << entry.mode << " " << entry.hash << " " << filepath << endl;
-        }
+        stringstream ss(line);
+        string mode, hash, filepath;
+        ss >> mode >> hash >> filepath;
+        index[filepath] = {mode, hash};
     }
 
-    void addToIndex(const string &filepath)
+    g_index_cache = index;
+    g_cache_loaded = true;
+    return index;
+}
+
+void writeIndex(const map<string, IndexEntry> &index)
+{
+    string indexPath = ".minigit/index";
+    ofstream file(indexPath);
+
+    for (const auto &[filepath, entry] : index)
     {
-        if (!fs::exists(filepath))
-        {
-            cerr << "fatal: pathspec '" << filepath << "' did not match any files" << endl;
-            return;
-        }
-
-        auto index = readIndex();
-        string hash = hashObject(filepath);
-        index[filepath] = {"100644", hash};
-        writeIndex(index);
-
-        cout << "Added file: \"" << filepath << "\"" << endl;
+        file << entry.mode << " " << entry.hash << " " << filepath << endl;
     }
 
-    void clearIndex()
+    // update cache
+    g_index_cache = index;
+    g_cache_loaded = true;
+}
+
+void addToIndex(const string &filepath)
+{
+    if (!fs::exists(filepath))
     {
-        string indexPath = ".minigit/index";
-        ofstream file(indexPath);
-        file << "";
+        cerr << "fatal: pathspec '" << filepath << "' did not match any files" << endl;
+        return;
     }
+
+    // Use cache to reduce file I/O
+    auto index = readIndex();
+    string hash = hashObject(filepath);
+    index[filepath] = {"100644", hash};
+
+    // persist change
+    writeIndex(index);
+
+    cout << "Added file: \"" << filepath << "\"" << endl;
+}
+
+void clearIndex()
+{
+    string indexPath = ".minigit/index";
+    ofstream file(indexPath);
+    file << "";
+
+    g_index_cache.clear();
+    g_cache_loaded = true;
+}
+
+cout << "Added file: \"" << filepath << "\"" << endl;
+}
+
+void clearIndex()
+{
+    string indexPath = ".minigit/index";
+    ofstream file(indexPath);
+    file << "";
+}
 
 } // namespace minigit

@@ -112,3 +112,21 @@ Repository Root (.minigit/):
 ---
 
 **Status**: 30% complete - Index format specification documented
+
+## Performance Notes (50% complete)
+
+To reduce the runtime cost of index operations, miniGit uses a small in-memory cache for the index:
+
+- Reads: `readIndex()` populates an in-memory cache on first access and returns the cached map on subsequent calls. This avoids repeatedly parsing `.minigit/index` when multiple operations (status, add, commit) query the index.
+- Writes: `writeIndex()` writes the provided `std::map<std::string, IndexEntry>` to `.minigit/index` and updates the cache. This ensures the on-disk index and cache stay consistent.
+- Adds: `addToIndex()` operates on the cached index and calls `writeIndex()` to persist changes. Future work could add a lazy-flush mode to batch multiple additions into a single disk write for large operations.
+
+Why this helps:
+- Reduces file I/O when many operations read the index repeatedly (status, tree generation, verification).
+- Keeps behavior deterministic while improving performance on common sequences of commands.
+
+Next steps to further optimize:
+- Implement a configurable lazy-flush mechanism to batch writes.
+- Use file locking when working in concurrent environments.
+- Consider a binary index format for faster parsing if performance becomes critical.
+
