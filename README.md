@@ -1,8 +1,7 @@
 # miniGit
 
-A minimal implementation of Git in C++20, built for educational purposes.
+**Data Structures and Algorithms Course Project**
 
-This project is a learning tool designed to uncover the core concepts behind Git's internal workings. It follows the excellent tutorial "[Write Yourself a Git!](https://wyag.thb.lt/)" but is implemented in modern C++ with a **clean, modular architecture**.
 
 ## ✨ Key Features
 

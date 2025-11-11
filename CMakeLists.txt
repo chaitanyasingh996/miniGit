@@ -37,5 +37,3 @@ target_include_directories(miniGit PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # Enable testing with CTest
 enable_testing()
 
-# Add tests in the future
-# add_subdirectory(tests)
