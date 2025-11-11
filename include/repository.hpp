@@ -7,6 +7,29 @@ using namespace std;
 
 namespace minigit
 {
+    /**
+     * @brief Check if repository has uncommitted changes
+     * @return true if index differs from HEAD tree, false otherwise
+     */
+    bool repositoryHasChanges();
+
+    /**
+     * @brief Get the tree hash from current HEAD commit
+     * @return Tree hash or empty string if no commits exist
+     */
+    string getHeadTreeHash();
+
+    /**
+     * @brief Get the current HEAD commit hash
+     * @return Commit hash or empty string if no commits exist
+     */
+    string getHeadCommit();
+
+    /**
+     * @brief Get list of untracked files in working directory
+     * @return Vector of file paths not in index
+     */
+    vector<string> getUntrackedFiles();
 
     /**
      * @brief Initialize a new miniGit repository
@@ -30,7 +53,7 @@ namespace minigit
      * @param ref Reference path (e.g., "refs/heads/main")
      * @return Hash or empty string if not found
      */
-    string getRefHash(const string& ref);
+    string getRefHash(const string &ref);
 
 } // namespace minigit
 
