@@ -98,33 +98,6 @@ public:
      */
     static void printTree(shared_ptr<MerkleNode> node, int indent = 0);
     
-private:
-    /**
-     * @brief Build tree recursively from working directory
-     * @param dir_path Directory path
-     * @return Merkle node for the directory
-     */
-    static shared_ptr<MerkleNode> buildFromDirectory(const string& dir_path);
-    
-    /**
-     * @brief Helper for comparing trees recursively
-     */
-    static void compareTreesHelper(
-        shared_ptr<MerkleNode> node1,
-        shared_ptr<MerkleNode> node2,
-        map<string, string>& changes
-    );
-    
-    /**
-     * @brief Helper for getting Merkle proof
-     */
-    static bool getMerkleProofHelper(
-        shared_ptr<MerkleNode> node,
-        const string& filepath,
-        vector<string>& proof
-    );
-};
-
 } // namespace minigit
 
 #endif // MINIGIT_MERKLE_HPP
