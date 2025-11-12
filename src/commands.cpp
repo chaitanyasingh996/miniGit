@@ -1,0 +1,222 @@
+// src/commands.cpp
+// Main command handlers
+
+#include "commands.hpp"
+#include "repository.hpp"
+#include "objects.hpp"
+#include "index.hpp"
+#include "utils.hpp"
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <filesystem>
+#include <chrono>
+
+using namespace std;
+namespace fs = filesystem;
+
+namespace minigit {
+
+void handleInit() {
+    initRepository();
+}
+
+void handleHashObject(int argc, char* argv[]) {
+    if (argc < 3) {
+        cerr << "Usage: miniGit hash-object <file>" << endl;
+        return;
+    }
+
+    string filePath = argv[2];
+
+    // Check if file exists in real filesystem
+    if (!fs::exists(filePath)) {
+        cerr << "Error: File not found: " << filePath << endl;
+        return;
+    }
+
+    cout << getFileHash(filePath) << endl;
+}
+
+void handleCatFile(int argc, char* argv[]) {
+    if (argc < 3) {
+        cerr << "Usage: miniGit cat-file <hash>" << endl;
+        return;
+    }
+
+    string hash = argv[2];
+    catFile(hash);
+}
+
+void handleAdd(int argc, char* argv[]) {
+    if (argc < 3) {
+        cerr << "Usage: miniGit add <file>" << endl;
+        return;
+    }
+
+    string filePath = argv[2];
+
+    // Check if file exists in real filesystem
+    if (!fs::exists(filePath)) {
+        cerr << "fatal: pathspec '" << filePath << "' did not match any files" << endl;
+        return;
+    }
+
+    string hash = hashObject(filePath);
+
+    // Add the file to the index
+    auto index = readIndex();
+    index[filePath] = {"100644", hash};
+    writeIndex(index);
+
+    cout << "Added file: \"" << filePath << "\"" << endl;
+}
+
+void handleCommit(int argc, char* argv[]) {
+    if (argc < 4 || string(argv[2]) != "-m") {
+        cerr << "Usage: miniGit commit -m <message>" << endl;
+        return;
+    }
+
+    string message = argv[3];
+
+    // Create a tree object
+    string tree_hash = writeTree();
+    if (tree_hash.empty()) {
+        cerr << "Error: Failed to write tree." << endl;
+        return;
+    }
+
+    // Get the parent commit
+    string parent_hash = getHeadCommit();
+
+    // Create the commit object
+    string commit_hash = writeCommit(tree_hash, parent_hash, message);
+    if (commit_hash.empty()) {
+        cerr << "Error: Failed to write commit." << endl;
+        return;
+    }
+
+    // Update the current branch ref or detached HEAD
+    string headPath = ".minigit/HEAD";
+    if (!fs::exists(headPath)) {
+        cerr << "Error: HEAD file not found." << endl;
+        return;
+    }
+    
+    ifstream head_file(headPath);
+    string head_content;
+    getline(head_file, head_content);
+    head_file.close();
+    
+    string ref_prefix = "ref: ";
+    if (head_content.rfind(ref_prefix, 0) == 0) {
+        // Update branch reference
+        string ref_path = head_content.substr(ref_prefix.length());
+        string refPath = ".minigit/" + ref_path;
+        ofstream ref_file(refPath);
+        ref_file << commit_hash << "\n";
+        
+        // Extract branch name
+        string branch_name = ref_path;
+        if (branch_name.rfind("refs/heads/", 0) == 0) {
+            branch_name = branch_name.substr(11); // strlen("refs/heads/")
+        }
+        cout << "[" << branch_name << " " << commit_hash.substr(0, 7) << "] " << message << endl;
+    } else {
+        // Detached HEAD - update HEAD directly
+        ofstream head_file_write(headPath);
+        head_file_write << commit_hash << "\n";
+        cout << "[detached HEAD " << commit_hash.substr(0, 7) << "] " << message << endl;
+    }
+}
+
+void handleLog() {
+    string current_hash = getHeadCommit();
+
+    while (!current_hash.empty()) {
+        Commit commit = readCommit(current_hash);
+
+        cout << "commit " << current_hash << endl;
+        
+        // Parse author line to extract name/email and timestamp
+        string authorInfo = commit.author;
+        string timestamp;
+        size_t timestampPos = authorInfo.find_last_of('>');
+        if (timestampPos != string::npos && timestampPos + 1 < authorInfo.length()) {
+            timestamp = authorInfo.substr(timestampPos + 1);
+            authorInfo = authorInfo.substr(0, timestampPos + 1);
+            // Trim whitespace from timestamp
+            timestamp.erase(0, timestamp.find_first_not_of(" \t"));
+        }
+        
+        cout << "Author: " << authorInfo << endl;
+        cout << "Date:   " << timestamp << endl;
+        cout << endl;
+        cout << "    " << commit.message << endl;
+
+        current_hash = commit.parent;
+        
+        // Add blank line between commits
+        if (!current_hash.empty()) {
+            cout << endl;
+        }
+    }
+}
+
+void handleStatus() {
+    auto index = readIndex();
+    string head_commit_hash = getHeadCommit();
+    Commit head_commit = readCommit(head_commit_hash);
+    map<string, string> head_files;
+    
+    if (!head_commit.tree.empty()) {
+        readTreeToMap(head_commit.tree, head_files);
+    }
+
+    string current_branch = getCurrentBranch();
+    if (current_branch.empty()) {
+        cout << "HEAD detached at " << getHeadCommit().substr(0, 7) << endl;
+    } else {
+        cout << "On branch " << current_branch << endl;
+    }
+    
+    cout << "Changes to be committed:" << endl;
+
+    for (const auto& [filepath, entry] : index) {
+        if (head_files.find(filepath) == head_files.end()) {
+            cout << "\tnew file:   " << filepath << endl;
+        } else if (head_files[filepath] != entry.hash) {
+            cout << "\tmodified:   " << filepath << endl;
+        }
+    }
+    
+    for (const auto& [filepath, hash] : head_files) {
+        if (index.find(filepath) == index.end()) {
+            cout << "\tdeleted:    " << filepath << endl;
+        }
+    }
+
+    cout << endl;
+    cout << "Changes not staged for commit:" << endl;
+    
+    auto working_dir_files = getWorkingDirectoryFiles();
+    for (const auto& filepath : working_dir_files) {
+        if (index.find(filepath) != index.end()) {
+            if (getFileHash(filepath) != index[filepath].hash) {
+                cout << "\tmodified:   " << filepath << endl;
+            }
+        }
+    }
+
+    cout << endl;
+    cout << "Untracked files:" << endl;
+    
+    for (const auto& filepath : working_dir_files) {
+        if (index.find(filepath) == index.end()) {
+            cout << "\t" << filepath << endl;
+        }
+    }
+
+    cout << endl;
+}
