@@ -335,3 +335,69 @@ void handleVerifyIntegrity() {
         exit(1);
     }
 }
+
+void handleCompareBranches(int argc, char* argv[]) {
+    if (argc < 4) {
+        cerr << "Usage: miniGit compare-branches <branch1> <branch2>" << endl;
+        return;
+    }
+    
+    string branch1 = argv[2];
+    string branch2 = argv[3];
+    
+    string root1 = getBranchMerkleRoot(branch1);
+    string root2 = getBranchMerkleRoot(branch2);
+    
+    if (root1.empty()) {
+        cerr << "Error: Branch '" << branch1 << "' not found" << endl;
+        return;
+    }
+    
+    if (root2.empty()) {
+        cerr << "Error: Branch '" << branch2 << "' not found" << endl;
+        return;
+    }
+    
+    cout << "Comparing branches using Merkle tree roots:" << endl;
+    cout << "  " << branch1 << ": " << root1 << endl;
+    cout << "  " << branch2 << ": " << root2 << endl;
+    cout << endl;
+    
+    if (branchesIdentical(branch1, branch2)) {
+        cout << "✓ Branches are IDENTICAL (same content)" << endl;
+    } else {
+        cout << "✗ Branches are DIFFERENT" << endl;
+        cout << "\nShowing file differences:" << endl;
+        
+        // Get files from both branches
+        map<string, string> files1, files2;
+        readTreeToMap(root1, files1);
+        readTreeToMap(root2, files2);
+        
+        // Find differences
+        bool has_diff = false;
+        for (const auto& [path, hash] : files1) {
+            auto it = files2.find(path);
+            if (it == files2.end()) {
+                cout << "  - " << path << " (only in " << branch1 << ")" << endl;
+                has_diff = true;
+            } else if (it->second != hash) {
+                cout << "  M " << path << " (modified)" << endl;
+                has_diff = true;
+            }
+        }
+        
+        for (const auto& [path, hash] : files2) {
+            if (files1.find(path) == files1.end()) {
+                cout << "  + " << path << " (only in " << branch2 << ")" << endl;
+                has_diff = true;
+            }
+        }
+        
+        if (!has_diff) {
+            cout << "  (No file differences, but tree structure differs)" << endl;
+        }
+    }
+}
+
+} // namespace minigit
