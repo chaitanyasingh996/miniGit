@@ -329,3 +329,9 @@ void handleDiffTree(int argc, char* argv[]) {
     
     cout << "\nTotal changes: " << changes.size() << endl;
 }
+
+void handleVerifyIntegrity() {
+    if (!verifyRepositoryIntegrity()) {
+        exit(1);
+    }
+}
