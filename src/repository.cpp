@@ -3,6 +3,7 @@
 
 #include "repository.hpp"
 #include "objects.hpp"
+#include "merkle.hpp"
 #include "index.hpp"
 #include "utils.hpp"
 #include <iostream>
@@ -175,3 +176,109 @@ bool branchesIdentical(const string& branch1, const string& branch2) {
     
     return root1 == root2;
 }
+
+bool verifyCommit(const string& commit_hash) {
+    if (commit_hash.empty()) {
+        return true;
+    }
+    
+    // Read the commit object
+    string commit_content = readObject(commit_hash);
+    if (commit_content.empty()) {
+        cerr << "Error: Commit object " << commit_hash << " not found" << endl;
+        return false;
+    }
+    
+    // Verify commit hash
+    string calculated_hash = calculateHash(commit_content);
+    if (calculated_hash != commit_hash) {
+        cerr << "Error: Commit " << commit_hash << " hash mismatch!" << endl;
+        cerr << "  Expected: " << commit_hash << endl;
+        cerr << "  Got:      " << calculated_hash << endl;
+        return false;
+    }
+    
+    // Parse the commit to get tree hash
+    Commit commit = readCommit(commit_hash);
+    if (commit.tree.empty()) {
+        cerr << "Error: Commit " << commit_hash << " has no tree" << endl;
+        return false;
+    }
+    
+    // Verify tree exists and is valid
+    string tree_content = readObject(commit.tree);
+    if (tree_content.empty()) {
+        cerr << "Error: Tree " << commit.tree << " not found" << endl;
+        return false;
+    }
+    
+    // Verify tree hash
+    string calculated_tree_hash = calculateHash(tree_content);
+    if (calculated_tree_hash != commit.tree) {
+        cerr << "Error: Tree " << commit.tree << " hash mismatch!" << endl;
+        return false;
+    }
+    
+    // Verify all blobs in the tree
+    map<string, string> files;
+    readTreeToMap(commit.tree, files);
+    
+    for (const auto& [filepath, blob_hash] : files) {
+        string blob_content = readObject(blob_hash);
+        if (blob_content.empty()) {
+            cerr << "Error: Blob " << blob_hash << " for file " << filepath << " not found" << endl;
+            return false;
+        }
+        
+        // Verify blob hash
+        string calculated_blob_hash = calculateHash(blob_content);
+        if (calculated_blob_hash != blob_hash) {
+            cerr << "Error: Blob " << blob_hash << " for file " << filepath << " hash mismatch!" << endl;
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool verifyRepositoryIntegrity() {
+    cout << "Verifying repository integrity..." << endl;
+    
+    string head_commit = getHeadCommit();
+    if (head_commit.empty()) {
+        cout << "No commits to verify." << endl;
+        return true;
+    }
+    
+    int commits_verified = 0;
+    int objects_verified = 0;
+    string current_hash = head_commit;
+    
+    while (!current_hash.empty()) {
+        cout << "Verifying commit " << current_hash.substr(0, 7) << "..." << endl;
+        
+        if (!verifyCommit(current_hash)) {
+            cerr << "✗ Repository integrity check FAILED!" << endl;
+            return false;
+        }
+        
+        commits_verified++;
+        
+        // Count objects in this commit
+        Commit commit = readCommit(current_hash);
+        map<string, string> files;
+        readTreeToMap(commit.tree, files);
+        objects_verified += files.size() + 1; // files + tree
+        
+        // Move to parent
+        current_hash = commit.parent;
+    }
+    
+    cout << "✓ Repository integrity verified!" << endl;
+    cout << "  Commits verified: " << commits_verified << endl;
+    cout << "  Objects verified: " << objects_verified << endl;
+    
+    return true;
+}
+
+} // namespace minigit
