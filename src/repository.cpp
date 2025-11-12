@@ -19,7 +19,7 @@ void initRepository() {
     string repoPath = ".minigit";
 
     if (fs::exists(repoPath)) {
-        cerr << "Reinitialization of an existing miniGit repository" << endl;
+        cerr << "Reinitialization of an existing repository" << endl;
         return;
     }
 
@@ -33,7 +33,7 @@ void initRepository() {
         ofstream head_file(repoPath + "/HEAD");
         head_file << "ref: refs/heads/main\n";
 
-        cout << "Initialized empty miniGit repository in .minigit" << endl;
+        cout << "Initialized empty repository in .minigit" << endl;
 
     } catch (const exception& e) {
         cerr << "Error creating repository: " << e.what() << endl;
@@ -155,15 +155,6 @@ bool repositoryHasChanges() {
     return false;
 }
 
-string getBranchMerkleRoot(const string& branch_name) {
-    string commit_hash = getRefHash("refs/heads/" + branch_name);
-    if (commit_hash.empty()) {
-        return "";
-    }
-    
-    Commit commit = readCommit(commit_hash);
-    return commit.tree;
-}
 
 bool branchesIdentical(const string& branch1, const string& branch2) {
     string root1 = getBranchMerkleRoot(branch1);
@@ -176,6 +167,15 @@ bool branchesIdentical(const string& branch1, const string& branch2) {
     return root1 == root2;
 }
 
+string getBranchMerkleRoot(const string& branch_name) {
+    string commit_hash = getRefHash("refs/heads/" + branch_name);
+    if (commit_hash.empty()) {
+        return "";
+    }
+    
+    Commit commit = readCommit(commit_hash);
+    return commit.tree;
+}
 bool verifyCommit(const string& commit_hash) {
     if (commit_hash.empty()) {
         return true;

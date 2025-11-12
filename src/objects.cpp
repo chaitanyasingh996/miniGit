@@ -11,7 +11,7 @@
 #include <filesystem>
 
 using namespace std;
-namespace fs = filesystem;
+namespace fs = filesystem; // namespace alias hai
 
 namespace minigit {
 
@@ -19,6 +19,20 @@ string calculateHash(const string& content) {
     SHA1 sha1;
     sha1.update(content);
     return sha1.final();
+}
+
+
+string readObject(const string& hash) {
+    string objectFile = ".minigit/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
+    
+    if (!fs::exists(objectFile)) {
+        return "";
+    }
+    
+    ifstream file(objectFile);
+    stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
 }
 
 string writeObject(const string& content) {
@@ -38,20 +52,6 @@ string writeObject(const string& content) {
 
     return hash;
 }
-
-string readObject(const string& hash) {
-    string objectFile = ".minigit/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
-    
-    if (!fs::exists(objectFile)) {
-        return "";
-    }
-
-    ifstream file(objectFile);
-    stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
-
 string hashObject(const string& filepath) {
     ifstream file(filepath, ios::binary);
     stringstream buffer;

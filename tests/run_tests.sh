@@ -211,6 +211,55 @@ test_empty_repository() {
     cleanup_test
 }
 
+# Test 7: Branch Comparison Edge Cases
+test_branch_edge_cases() {
+    print_header "Test 7: Branch Comparison Edge Cases"
+    
+    setup_test
+    
+    # Create commit
+    echo "content" > file.txt
+    $MINIGIT add file.txt > /dev/null 2>&1
+    $MINIGIT commit -m "Commit" > /dev/null 2>&1
+    
+    # Compare non-existent branches (should print error but might not return error code)
+    OUTPUT=$($MINIGIT compare-branches main nonexistent 2>&1)
+    echo "$OUTPUT" | grep -q "not found"
+    print_result $? "Handle non-existent branch gracefully"
+    
+    cleanup_test
+}
+
+# Test 8: Multiple File Changes
+test_multiple_files() {
+    print_header "Test 8: Multiple File Operations"
+    
+    setup_test
+    
+    # Create multiple files
+    echo "file 1" > file1.txt
+    echo "file 2" > file2.txt
+    echo "file 3" > file3.txt
+    $MINIGIT add file1.txt file2.txt file3.txt > /dev/null 2>&1
+    $MINIGIT commit -m "Add 3 files" > /dev/null 2>&1
+    print_result $? "Add multiple files in single commit"
+    
+    # Create branch
+    $MINIGIT branch modify > /dev/null 2>&1
+    $MINIGIT switch modify > /dev/null 2>&1
+    
+    # Modify only one file
+    echo "modified" > file2.txt
+    $MINIGIT add file2.txt > /dev/null 2>&1
+    $MINIGIT commit -m "Modify one file" > /dev/null 2>&1
+    
+    # Compare should show difference
+    OUTPUT=$($MINIGIT compare-branches main modify 2>&1)
+    echo "$OUTPUT" | grep -q "DIFFERENT"
+    print_result $? "Detect single file change among many"
+    
+    cleanup_test
+}
 
 # Run all tests
 main() {

@@ -31,6 +31,30 @@ string getFileHash(const string& filepath) {
     return sha1.final();
 }
 
+void readTreeToMap(const string& hash, map<string, string>& files) {
+    string raw_content = readObject(hash);
+    
+    if (raw_content.empty()) {
+        return;
+    }
+    
+    size_t null_pos = raw_content.find('\0');
+    if (null_pos == string::npos) {
+        return;
+    }
+    
+    string content = raw_content.substr(null_pos + 1);
+    stringstream content_stream(content);
+    string line;
+    
+    while (getline(content_stream, line)) {
+        stringstream line_stream(line);
+        string mode, type, file_hash, filepath;
+        line_stream >> mode >> type >> file_hash >> filepath;
+        files[filepath] = file_hash;
+    }
+}
+
 vector<string> getWorkingDirectoryFiles() {
     vector<string> files;
     vector<string> ignore_patterns;
@@ -64,30 +88,6 @@ vector<string> getWorkingDirectoryFiles() {
     }
     
     return files;
-}
-
-void readTreeToMap(const string& hash, map<string, string>& files) {
-    string raw_content = readObject(hash);
-    
-    if (raw_content.empty()) {
-        return;
-    }
-
-    size_t null_pos = raw_content.find('\0');
-    if (null_pos == string::npos) {
-        return;
-    }
-
-    string content = raw_content.substr(null_pos + 1);
-    stringstream content_stream(content);
-    string line;
-
-    while (getline(content_stream, line)) {
-        stringstream line_stream(line);
-        string mode, type, file_hash, filepath;
-        line_stream >> mode >> type >> file_hash >> filepath;
-        files[filepath] = file_hash;
-    }
 }
 
 } // namespace minigit
