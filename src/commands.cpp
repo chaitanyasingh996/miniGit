@@ -220,3 +220,112 @@ void handleStatus() {
 
     cout << endl;
 }
+
+void handleVerifyTree(int argc, char* argv[]) {
+    if (argc < 3) {
+        cerr << "Usage: miniGit verify-tree [--working-dir | <tree-hash>]" << endl;
+        cerr << "  --working-dir : Verify current working directory" << endl;
+        cerr << "  <tree-hash>   : Verify a specific tree object" << endl;
+        return;
+    }
+
+    string arg = argv[2];
+    
+    if (arg == "--working-dir") {
+        // Build and display Merkle tree from working directory
+        cout << "Building Merkle tree from working directory..." << endl;
+        auto tree = MerkleTree::buildFromWorkingDirectory();
+        
+        cout << "\nMerkle Tree Structure:" << endl;
+        MerkleTree::printTree(tree);
+        
+        cout << "\nMerkle Root Hash: " << tree->hash << endl;
+        
+        // Verify integrity
+        bool valid = MerkleTree::verifyTree(tree->hash, tree);
+        cout << "Tree Integrity: " << (valid ? "✓ VALID" : "✗ INVALID") << endl;
+        
+    } else {
+        // Verify a tree object
+        string tree_hash = arg;
+        cout << "Building Merkle tree from tree object: " << tree_hash << endl;
+        
+        try {
+            auto tree = MerkleTree::buildFromTreeObject(tree_hash);
+            
+            cout << "\nMerkle Tree Structure:" << endl;
+            MerkleTree::printTree(tree);
+            
+            cout << "\nMerkle Root Hash: " << tree->hash << endl;
+            
+            bool valid = MerkleTree::verifyTree(tree->hash, tree);
+            cout << "Tree Integrity: " << (valid ? "✓ VALID" : "✗ INVALID") << endl;
+            
+        } catch (const exception& e) {
+            cerr << "Error: " << e.what() << endl;
+        }
+    }
+}
+
+void handleDiffTree(int argc, char* argv[]) {
+    if (argc < 4) {
+        cerr << "Usage: miniGit diff-tree <tree-hash-1> <tree-hash-2>" << endl;
+        cerr << "       miniGit diff-tree --working-dir <commit-hash>" << endl;
+        cerr << "  Compare two tree objects or working directory with a commit" << endl;
+        return;
+    }
+
+    string arg1 = argv[2];
+    string arg2 = argv[3];
+    
+    shared_ptr<MerkleNode> tree1, tree2;
+    
+    if (arg1 == "--working-dir") {
+        cout << "Comparing working directory with commit " << arg2 << endl;
+        tree1 = MerkleTree::buildFromWorkingDirectory();
+        
+        // Get tree hash from commit
+        try {
+            auto commit = readCommit(arg2);
+            tree2 = MerkleTree::buildFromTreeObject(commit.tree);
+        } catch (...) {
+            cerr << "Error: Invalid commit hash" << endl;
+            return;
+        }
+    } else {
+        cout << "Comparing tree " << arg1 << " with tree " << arg2 << endl;
+        tree1 = MerkleTree::buildFromTreeObject(arg1);
+        tree2 = MerkleTree::buildFromTreeObject(arg2);
+    }
+    
+    // Quick check using Merkle root
+    if (tree1->hash == tree2->hash) {
+        cout << "\n✓ Trees are identical (Merkle roots match)" << endl;
+        cout << "Merkle Root: " << tree1->hash << endl;
+        return;
+    }
+    
+    cout << "\n⚠ Trees differ (Merkle roots don't match)" << endl;
+    cout << "Tree 1 Root: " << tree1->hash << endl;
+    cout << "Tree 2 Root: " << tree2->hash << endl;
+    
+    // Find detailed differences
+    cout << "\nDetailed differences:" << endl;
+    auto changes = MerkleTree::compareTrees(tree1, tree2);
+    
+    if (changes.empty()) {
+        cout << "  (No file-level changes detected)" << endl;
+    } else {
+        for (const auto& [path, status] : changes) {
+            if (status == "added") {
+                cout << "  A " << path << " (added)" << endl;
+            } else if (status == "deleted") {
+                cout << "  D " << path << " (deleted)" << endl;
+            } else if (status == "modified") {
+                cout << "  M " << path << " (modified)" << endl;
+            }
+        }
+    }
+    
+    cout << "\nTotal changes: " << changes.size() << endl;
+}

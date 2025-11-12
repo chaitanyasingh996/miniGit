@@ -36,6 +36,42 @@ void handleAdd(int argc, char* argv[]);
  */
 void handleCommit(int argc, char* argv[]);
 
-}
+/**
+ * @brief Handle the 'log' command
+ */
+void handleLog();
+
+/**
+ * @brief Handle the 'status' command
+ */
+void handleStatus();
+
+/**
+ * @brief Handle the 'verify-tree' command
+ * @param argc Argument count
+ * @param argv Argument vector
+ */
+void handleVerifyTree(int argc, char* argv[]);
+
+/**
+ * @brief Handle the 'diff-tree' command
+ * @param argc Argument count
+ * @param argv Argument vector
+ */
+void handleDiffTree(int argc, char* argv[]);
+
+/**
+ * @brief Handle the 'verify-integrity' command
+ */
+void handleVerifyIntegrity();
+
+/**
+ * @brief Handle the 'compare-branches' command
+ * @param argc Argument count
+ * @param argv Argument vector
+ */
+void handleCompareBranches(int argc, char* argv[]);
+
+} // namespace minigit
 
 #endif // MINIGIT_COMMANDS_HPP
