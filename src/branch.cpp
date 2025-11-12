@@ -161,86 +161,144 @@ void handleSwitch(int argc, char* argv[]) {
     cout << "Switched to branch '" << branch_name << "'" << endl;
 }
 
-void handleCheckout(int argc, char* argv[]) {
+void handleStash(int argc, char* argv[]) {
     if (argc < 3) {
-        cerr << "Usage: miniGit checkout <commit-hash|branch-name>" << endl;
+        cerr << "Usage: miniGit stash <save|pop|list>" << endl;
         return;
     }
 
-    string target = argv[2];
-    string commit_hash;
-    bool is_branch = false;
-    
-    // Check if target is a branch name
-    fs::path branchPath = fs::path(".minigit") / "refs" / "heads" / target;
-    if (fs::exists(branchPath)) {
-        is_branch = true;
-        ifstream branchFile(branchPath);
-        getline(branchFile, commit_hash);
-    } else {
-        // Assume it's a commit hash
-        commit_hash = target;
-    }
+    string subcommand = argv[2];
+    fs::path stashDir = ".minigit/stash";
 
-    Commit commit = readCommit(commit_hash);
-
-    if (commit.tree.empty()) {
-        cerr << "Error: Invalid commit or tree." << endl;
-        return;
-    }
-
-    // Read the tree
-    map<string, string> files;
-    readTreeToMap(commit.tree, files);
-
-    // Clear the working directory (of tracked files)
-    auto index = readIndex();
-    for (const auto& [filepath, entry] : index) {
-        if (fs::exists(filepath)) {
-            cout << "Removing: " << filepath << endl;
-            fs::remove(filepath);
-        }
-    }
-
-    // Write the files from the tree
-    for (const auto& [filepath, hash] : files) {
-        fs::path objectFile = fs::path(".minigit") / "objects" / hash.substr(0, 2) / hash.substr(2);
-        ifstream file(objectFile, ios::binary);
-        stringstream buffer;
-        buffer << file.rdbuf();
-        string raw_content = buffer.str();
-
-        size_t null_pos = raw_content.find('\0');
-        string content = raw_content.substr(null_pos + 1);
-
-        // Create parent directories if needed
-        fs::path file_path(filepath);
-        if (file_path.has_parent_path()) {
-            fs::create_directories(file_path.parent_path());
+    if (subcommand == "save") {
+        // Create stash directory if it doesn't exist
+        if (!fs::exists(stashDir)) {
+            fs::create_directory(stashDir);
         }
 
-        ofstream outFile(filepath);
-        outFile << content;
-    }
+        // Get current index
+        auto index = readIndex();
+        if (index.empty()) {
+            cout << "No changes to stash" << endl;
+            return;
+        }
 
-    // Update index to match the tree
-    map<string, IndexEntry> new_index;
-    for (const auto& [filepath, hash] : files) {
-        new_index[filepath] = {"100644", hash};
-    }
-    writeIndex(new_index);
+        // Create a stash entry
+        auto now = chrono::system_clock::now();
+        auto timestamp = chrono::duration_cast<chrono::seconds>(now.time_since_epoch()).count();
+        string stash_id = to_string(timestamp);
+        
+        fs::path stashFile = stashDir / stash_id;
+        
+        // Save current index to stash
+        ofstream stash(stashFile);
+        for (const auto& [filepath, entry] : index) {
+            stash << entry.mode << " " << entry.hash << " " << filepath << endl;
+        }
+        stash.close();
 
-    // Update HEAD
-    fs::path headPath = ".minigit/HEAD";
-    ofstream headFile(headPath, ios::trunc);
-    if (is_branch) {
-        headFile << "ref: refs/heads/" << target << endl;
-        cout << "Switched to branch '" << target << "'" << endl;
+        // Clear the index
+        writeIndex({});
+        
+        // Remove files from working directory
+        for (const auto& [filepath, entry] : index) {
+            if (fs::exists(filepath)) {
+                fs::remove(filepath);
+            }
+        }
+
+        cout << "Saved working directory and index state" << endl;
+        cout << "Stash ID: " << stash_id << endl;
+
+    } else if (subcommand == "pop") {
+        if (!fs::exists(stashDir)) {
+            cout << "No stash entries found" << endl;
+            return;
+        }
+
+        // Find the most recent stash
+        string latest_stash;
+        for (const auto& entry : fs::directory_iterator(stashDir)) {
+            if (entry.is_regular_file()) {
+                string filename = entry.path().filename().string();
+                if (latest_stash.empty() || filename > latest_stash) {
+                    latest_stash = filename;
+                }
+            }
+        }
+
+        if (latest_stash.empty()) {
+            cout << "No stash entries found" << endl;
+            return;
+        }
+
+        fs::path stashFile = stashDir / latest_stash;
+        
+        // Read stash
+        map<string, IndexEntry> stashed_index;
+        ifstream stash(stashFile);
+        string line;
+        while (getline(stash, line)) {
+            stringstream ss(line);
+            string mode, hash, filepath;
+            ss >> mode >> hash >> filepath;
+            stashed_index[filepath] = {mode, hash};
+        }
+        stash.close();
+
+        // Restore files to working directory
+        for (const auto& [filepath, entry] : stashed_index) {
+            string content = readBlobContent(entry.hash);
+            
+            // Create parent directories if needed
+            fs::path file_path(filepath);
+            if (file_path.has_parent_path()) {
+                fs::create_directories(file_path.parent_path());
+            }
+            
+            ofstream outFile(filepath);
+            outFile << content;
+            outFile.close();
+        }
+
+        // Restore index
+        writeIndex(stashed_index);
+
+        // Remove stash file
+        fs::remove(stashFile);
+
+        cout << "Restored stash: " << latest_stash << endl;
+        cout << "Dropped stash" << endl;
+
+    } else if (subcommand == "list") {
+        if (!fs::exists(stashDir)) {
+            cout << "No stash entries found" << endl;
+            return;
+        }
+
+        vector<string> stashes;
+        for (const auto& entry : fs::directory_iterator(stashDir)) {
+            if (entry.is_regular_file()) {
+                stashes.push_back(entry.path().filename().string());
+            }
+        }
+
+        if (stashes.empty()) {
+            cout << "No stash entries found" << endl;
+        } else {
+            sort(stashes.rbegin(), stashes.rend()); // Newest first
+            cout << "Stash entries:" << endl;
+            int index = 0;
+            for (const auto& stash : stashes) {
+                cout << "stash@{" << index++ << "}: " << stash << endl;
+            }
+        }
     } else {
-        headFile << commit_hash << endl;
-        cout << "HEAD is now at " << commit_hash.substr(0, 7) << " (detached)" << endl;
+        cerr << "Unknown stash subcommand: " << subcommand << endl;
+        cerr << "Usage: miniGit stash <save|pop|list>" << endl;
     }
 }
+
 
 void handleMerge(int argc, char* argv[]) {
     if (argc < 3) {
@@ -419,141 +477,84 @@ void handleMerge(int argc, char* argv[]) {
     }
 }
 
-void handleStash(int argc, char* argv[]) {
+void handleCheckout(int argc, char* argv[]) {
     if (argc < 3) {
-        cerr << "Usage: miniGit stash <save|pop|list>" << endl;
+        cerr << "Usage: miniGit checkout <commit-hash|branch-name>" << endl;
         return;
     }
 
-    string subcommand = argv[2];
-    fs::path stashDir = ".minigit/stash";
-
-    if (subcommand == "save") {
-        // Create stash directory if it doesn't exist
-        if (!fs::exists(stashDir)) {
-            fs::create_directory(stashDir);
-        }
-
-        // Get current index
-        auto index = readIndex();
-        if (index.empty()) {
-            cout << "No changes to stash" << endl;
-            return;
-        }
-
-        // Create a stash entry
-        auto now = chrono::system_clock::now();
-        auto timestamp = chrono::duration_cast<chrono::seconds>(now.time_since_epoch()).count();
-        string stash_id = to_string(timestamp);
-        
-        fs::path stashFile = stashDir / stash_id;
-        
-        // Save current index to stash
-        ofstream stash(stashFile);
-        for (const auto& [filepath, entry] : index) {
-            stash << entry.mode << " " << entry.hash << " " << filepath << endl;
-        }
-        stash.close();
-
-        // Clear the index
-        writeIndex({});
-        
-        // Remove files from working directory
-        for (const auto& [filepath, entry] : index) {
-            if (fs::exists(filepath)) {
-                fs::remove(filepath);
-            }
-        }
-
-        cout << "Saved working directory and index state" << endl;
-        cout << "Stash ID: " << stash_id << endl;
-
-    } else if (subcommand == "pop") {
-        if (!fs::exists(stashDir)) {
-            cout << "No stash entries found" << endl;
-            return;
-        }
-
-        // Find the most recent stash
-        string latest_stash;
-        for (const auto& entry : fs::directory_iterator(stashDir)) {
-            if (entry.is_regular_file()) {
-                string filename = entry.path().filename().string();
-                if (latest_stash.empty() || filename > latest_stash) {
-                    latest_stash = filename;
-                }
-            }
-        }
-
-        if (latest_stash.empty()) {
-            cout << "No stash entries found" << endl;
-            return;
-        }
-
-        fs::path stashFile = stashDir / latest_stash;
-        
-        // Read stash
-        map<string, IndexEntry> stashed_index;
-        ifstream stash(stashFile);
-        string line;
-        while (getline(stash, line)) {
-            stringstream ss(line);
-            string mode, hash, filepath;
-            ss >> mode >> hash >> filepath;
-            stashed_index[filepath] = {mode, hash};
-        }
-        stash.close();
-
-        // Restore files to working directory
-        for (const auto& [filepath, entry] : stashed_index) {
-            string content = readBlobContent(entry.hash);
-            
-            // Create parent directories if needed
-            fs::path file_path(filepath);
-            if (file_path.has_parent_path()) {
-                fs::create_directories(file_path.parent_path());
-            }
-            
-            ofstream outFile(filepath);
-            outFile << content;
-            outFile.close();
-        }
-
-        // Restore index
-        writeIndex(stashed_index);
-
-        // Remove stash file
-        fs::remove(stashFile);
-
-        cout << "Restored stash: " << latest_stash << endl;
-        cout << "Dropped stash" << endl;
-
-    } else if (subcommand == "list") {
-        if (!fs::exists(stashDir)) {
-            cout << "No stash entries found" << endl;
-            return;
-        }
-
-        vector<string> stashes;
-        for (const auto& entry : fs::directory_iterator(stashDir)) {
-            if (entry.is_regular_file()) {
-                stashes.push_back(entry.path().filename().string());
-            }
-        }
-
-        if (stashes.empty()) {
-            cout << "No stash entries found" << endl;
-        } else {
-            sort(stashes.rbegin(), stashes.rend()); // Newest first
-            cout << "Stash entries:" << endl;
-            int index = 0;
-            for (const auto& stash : stashes) {
-                cout << "stash@{" << index++ << "}: " << stash << endl;
-            }
-        }
+    string target = argv[2];
+    string commit_hash;
+    bool is_branch = false;
+    
+    // Check if target is a branch name
+    fs::path branchPath = fs::path(".minigit") / "refs" / "heads" / target;
+    if (fs::exists(branchPath)) {
+        is_branch = true;
+        ifstream branchFile(branchPath);
+        getline(branchFile, commit_hash);
     } else {
-        cerr << "Unknown stash subcommand: " << subcommand << endl;
-        cerr << "Usage: miniGit stash <save|pop|list>" << endl;
+        // Assume it's a commit hash
+        commit_hash = target;
+    }
+
+    Commit commit = readCommit(commit_hash);
+
+    if (commit.tree.empty()) {
+        cerr << "Error: Invalid commit or tree." << endl;
+        return;
+    }
+
+    // Read the tree
+    map<string, string> files;
+    readTreeToMap(commit.tree, files);
+
+    // Clear the working directory (of tracked files)
+    auto index = readIndex();
+    for (const auto& [filepath, entry] : index) {
+        if (fs::exists(filepath)) {
+            cout << "Removing: " << filepath << endl;
+            fs::remove(filepath);
+        }
+    }
+
+    // Write the files from the tree
+    for (const auto& [filepath, hash] : files) {
+        fs::path objectFile = fs::path(".minigit") / "objects" / hash.substr(0, 2) / hash.substr(2);
+        ifstream file(objectFile, ios::binary);
+        stringstream buffer;
+        buffer << file.rdbuf();
+        string raw_content = buffer.str();
+
+        size_t null_pos = raw_content.find('\0');
+        string content = raw_content.substr(null_pos + 1);
+
+        // Create parent directories if needed
+        fs::path file_path(filepath);
+        if (file_path.has_parent_path()) {
+            fs::create_directories(file_path.parent_path());
+        }
+
+        ofstream outFile(filepath);
+        outFile << content;
+    }
+
+    // Update index to match the tree
+    map<string, IndexEntry> new_index;
+    for (const auto& [filepath, hash] : files) {
+        new_index[filepath] = {"100644", hash};
+    }
+    writeIndex(new_index);
+
+    // Update HEAD
+    fs::path headPath = ".minigit/HEAD";
+    ofstream headFile(headPath, ios::trunc);
+    if (is_branch) {
+        headFile << "ref: refs/heads/" << target << endl;
+        cout << "Switched to branch '" << target << "'" << endl;
+    } else {
+        headFile << commit_hash << endl;
+        cout << "HEAD is now at " << commit_hash.substr(0, 7) << " (detached)" << endl;
     }
 }
 

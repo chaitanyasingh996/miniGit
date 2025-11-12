@@ -3,7 +3,6 @@
 
 #include "repository.hpp"
 #include "objects.hpp"
-#include "merkle.hpp"
 #include "index.hpp"
 #include "utils.hpp"
 #include <iostream>
