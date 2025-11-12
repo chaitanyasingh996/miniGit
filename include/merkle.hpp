@@ -65,7 +65,32 @@ public:
      */
     static bool verifyTree(const string& root_hash, shared_ptr<MerkleNode> tree);
     
-
+    /**
+     * @brief Get the Merkle proof path for a specific file
+     * @param tree The tree
+     * @param filepath Path to the file
+     * @return Vector of hashes forming the proof path
+     */
+    static vector<string> getMerkleProof(
+        shared_ptr<MerkleNode> tree, 
+        const string& filepath
+    );
+    
+    /**
+     * @brief Verify a file's inclusion in the tree using Merkle proof
+     * @param filepath The file path
+     * @param file_hash Hash of the file
+     * @param proof The Merkle proof path
+     * @param root_hash The Merkle root hash
+     * @return True if proof is valid
+     */
+    static bool verifyMerkleProof(
+        const string& filepath,
+        const string& file_hash,
+        const vector<string>& proof,
+        const string& root_hash
+    );
+    
     /**
      * @brief Print the Merkle tree structure (for debugging)
      * @param node Root node
