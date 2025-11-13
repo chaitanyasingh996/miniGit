@@ -3,7 +3,8 @@
 # miniGit Merkle Tree Features Test Suite
 # Tests all three implemented Merkle tree features
 
-MINIGIT="/home/siddhant/Documents/miniGit/build/miniGit"
+# MINIGIT="/home/siddhant/Documents/miniGit/build/miniGit"
+MINIGIT="../../build/miniGit.exe "
 TEST_DIR="test_repo"
 
 # Colors for output
