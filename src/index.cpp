@@ -7,6 +7,11 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+using namespace std;
+
+namespace minigit {
+
+namespace fs = std::filesystem; 
 // Simple in-memory cache to avoid repeated file reads
 static map<string, IndexEntry> g_index_cache;
 static bool g_cache_loaded = false;
@@ -86,15 +91,4 @@ void clearIndex()
     g_index_cache.clear();
     g_cache_loaded = true;
 }
-
-cout << "Added file: \"" << filepath << "\"" << endl;
 }
-
-void clearIndex()
-{
-    string indexPath = ".minigit/index";
-    ofstream file(indexPath);
-    file << "";
-}
-
-} // namespace minigit
