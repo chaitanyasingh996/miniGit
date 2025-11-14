@@ -1,7 +1,9 @@
+
 # miniGit
 
-**Data Structures and Algorithms Course Project**
+**A Data Structures and Algorithms Course Project**
 
+---
 
 ## ✨ Key Features
 
@@ -15,32 +17,33 @@
 - **Working directory status** (`status`)
 - **Branch management** (`branch`, `switch`)
 
-### 🌳 Merkle Tree Features (NEW!)
+### 🌳 Merkle Tree Features
+- **Fast Change Detection:** O(1) working directory status using Merkle root comparison
+- **Efficient Branch Comparison:** Instantly compare two branches using Merkle roots
+- **Integrity Verification:** Detect corruption/tampering by recursively validating all objects
 
-miniGit leverages **Merkle trees** for efficient operations:
-
-1. **Fast Change Detection** 
-   - Instantly detect if working directory has changes
-   - O(1) comparison instead of checking every file
-   - Uses cryptographic hashing for integrity
-
-2. **Efficient Branch Comparison**
-   - Compare two branches in constant time
-   - Identify differences without scanning all files
-   - Perfect for large repositories
-
-3. **Integrity Verification**
-   - Verify entire repository hasn't been corrupted
-   - Detect tampering or bit rot
-   - Validates all commits and objects recursively
-
-**New Commands:**
+**Special Commands:**
 ```bash
 miniGit verify-integrity           # Verify repository integrity
 miniGit compare-branches main dev  # Compare branch contents
 ```
 
-## Project Structure
+---
+
+## 📚 Data Structures & Algorithms
+
+- **std::map (Red-Black Tree):** Used for index and commit history (ordered, O(log n) lookup)
+- **Merkle Tree:** Used for fast change detection, branch comparison, and integrity verification
+- **Linked List:** Commit parent chains for history traversal
+- **std::string:** For hash storage and manipulation
+- **structs:** For index entries and commit objects (POD types)
+- **Content-Addressable Storage:** 2-level directory sharding for object database
+
+See [docs/internals.md](docs/internals.md) for format specs and rationale.
+
+---
+
+## 🏗️ Project Structure
 
 ```
 miniGit/
@@ -55,49 +58,52 @@ miniGit/
 │   ├── merkle.cpp       # Merkle tree operations
 │   └── utils.cpp        # Utilities
 ├── docs/            # Documentation
-│   └── DATA_STRUCTURES.md  # Data structure reference
+│   ├── internals.md      # Internal format/design
+│   └── TEAM_CONTRIBUTIONS.txt # Team commit breakdown
 ├── tests/           # Test suite
 │   └── run_tests.sh        # Comprehensive test script (19 tests)
 └── build/           # Build artifacts
 ```
 
-## Building
+---
 
-To build miniGit, you need a C++20 compatible compiler and CMake.
+## ⚙️ Building
+
+Requires: C++20 compiler, CMake 3.16+, OpenSSL (for SHA-1)
 
 ```bash
-# Using CMake
+# Build instructions
 mkdir -p build
 cd build
 cmake ..
 make
 ```
+Executable: `build/miniGit`
 
-The executable will be at `build/miniGit`.
+---
 
-## Testing
+## 🧪 Testing
 
-miniGit includes a comprehensive test suite for all Merkle tree features:
+miniGit includes a comprehensive test suite for all Merkle tree and core features:
 
 ```bash
-# Run all tests
 cd tests
 ./run_tests.sh
 ```
 
 **Test Coverage (19 tests):**
-- ✅ Basic repository operations (4 tests)
-- ✅ Fast change detection (3 tests)
-- ✅ Efficient branch comparison (4 tests)
-- ✅ Integrity verification (2 tests)
-- ✅ Corruption detection (2 tests)
-- ✅ Empty repository handling (1 test)
-- ✅ Branch comparison edge cases (1 test)
-- ✅ Multiple file operations (2 tests)
+- ✅ Basic repository operations
+- ✅ Fast change detection
+- ✅ Efficient branch comparison
+- ✅ Integrity verification
+- ✅ Corruption detection
+- ✅ Empty repository handling
+- ✅ Branch comparison edge cases
+- ✅ Multiple file operations
 
-The test suite is a single shell script (`tests/run_tests.sh`) that comprehensively validates all Merkle tree functionality.
+---
 
-## Usage
+## 🚀 Usage
 
 ```bash
 ./build/miniGit <command> [options]
@@ -127,35 +133,24 @@ miniGit verify-integrity
 miniGit compare-branches main feature
 ```
 
-## Merkle Tree Use Cases
+---
 
-### 1. Quick Status Checks
-Instead of scanning all files, compare a single hash:
-```bash
-# Internally uses Merkle tree root comparison
-miniGit status
-```
+## 🌳 Merkle Tree Use Cases
 
-### 2. Branch Comparison
-Instantly see if branches have diverged:
-```bash
-miniGit compare-branches main develop
-# Output shows:
-#   ✓ IDENTICAL - branches have same content
-#   ✗ DIFFERENT - shows which files differ
-```
+1. **Quick Status Checks:** O(1) working directory status
+2. **Branch Comparison:** Instantly see if branches have diverged
+3. **Corruption Detection:** Verify repository integrity recursively
 
-### 3. Corruption Detection
-Verify repository hasn't been tampered with:
-```bash
-miniGit verify-integrity
-# Verifies:
-#   - All commit hashes valid
-#   - All tree hashes valid  
-#   - All blob hashes valid
-#   - Chain of custody intact
-```
+---
 
-## Documentation
+## 👥 Team & Documentation
 
-- **[docs/DATA_STRUCTURES.md](docs/DATA_STRUCTURES.md)** - Detailed explanation of data structures including Merkle trees
+- **Team Contributions:** See [docs/TEAM_CONTRIBUTIONS.txt](docs/TEAM_CONTRIBUTIONS.txt) for a full breakdown of sequential commits and member roles.
+- **Internals:** [docs/internals.md](docs/internals.md) covers index format, object database, Merkle tree, and rationale.
+- **SHA-1 Implementation:** See `include/sha1.hpp` for a fully documented cryptographic hash algorithm.
+
+---
+
+## 📖 License
+
+MIT
