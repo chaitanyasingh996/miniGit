@@ -3,8 +3,13 @@
 # miniGit Merkle Tree Features Test Suite
 # Tests all three implemented Merkle tree features
 
-# MINIGIT="/home/siddhant/Documents/miniGit/build/miniGit"
-MINIGIT="../../build/miniGit.exe "
+# Detect OS and set executable path accordingly
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
+    MINIGIT="../../build/miniGit.exe"
+else
+    MINIGIT="../../build/miniGit"
+fi
+
 TEST_DIR="test_repo"
 
 # Colors for output
